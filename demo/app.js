@@ -100,11 +100,17 @@ startCameraButton?.addEventListener("click", async () => {
     return;
   }
 
-  // 检查协议（HTTPS 或 localhost）
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-    updateStatus("需要 HTTPS 連線才能使用攝影機");
-    alert("為了使用攝影機功能，請使用 HTTPS 連線或 localhost。\n\n如果您在手機上，請確保使用 HTTPS 連線。");
-    return;
+  // 检查协议（HTTPS 或 localhost）- 只显示警告，不阻止
+  // 某些浏览器在非安全环境下也可以工作
+  const isSecureContext = location.protocol === 'https:' || 
+                          location.hostname === 'localhost' || 
+                          location.hostname === '127.0.0.1' ||
+                          location.hostname.startsWith('192.168.') ||
+                          location.hostname.startsWith('10.') ||
+                          location.hostname.startsWith('172.');
+  
+  if (!isSecureContext) {
+    console.warn('非安全連線，攝影機功能可能受限');
   }
 
   try {
