@@ -82,10 +82,20 @@ loadSessions();
 // 静态文件服务 - 提供 demo 文件夹
 app.use(express.static(path.join(__dirname, 'demo')));
 
+// 根路径重定向到 index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'demo', 'index.html'));
+});
+
 // 上传录影文件
 app.post('/api/upload', upload.single('video'), (req, res) => {
+  console.log('Upload request received');
+  console.log('File:', req.file ? { filename: req.file.filename, size: req.file.size } : 'No file');
+  console.log('Body:', req.body);
+  
   try {
     if (!req.file) {
+      console.error('No file uploaded');
       return res.status(400).json({ error: 'No video file uploaded' });
     }
 
@@ -101,16 +111,21 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
       size: req.file.size
     };
 
+    console.log('Session data:', session);
+
     // 重新加载以确保获取最新数据（多设备共享）
     const sessions = loadSessions();
     // 检查是否已存在（避免重复）
     const existingIndex = sessions.findIndex(s => s.id === session.id);
     if (existingIndex >= 0) {
+      console.log('Updating existing session:', session.id);
       sessions[existingIndex] = session;
     } else {
+      console.log('Adding new session:', session.id);
       sessions.push(session);
     }
     saveSessions(sessions);
+    console.log('Sessions saved, total:', sessions.length);
 
     res.json({
       success: true,
@@ -119,7 +134,7 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Failed to upload video' });
+    res.status(500).json({ error: 'Failed to upload video', details: error.message });
   }
 });
 

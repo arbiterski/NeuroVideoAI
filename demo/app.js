@@ -24,14 +24,26 @@ let recordingChunks = [];
 let poseActive = false;
 
 const sessionStorageKey = "poseSessions";
-// API 服务器地址 - 如果前端和服务器在同一端口，使用相同端口；否则使用 3000
+// API 服务器地址 - 始终使用 3000 端口（服务器端口）
 const API_BASE_URL = (() => {
-  const port = window.location.port;
-  if (port && port !== '8000') {
-    return `${window.location.protocol}//${window.location.hostname}:${port}`;
+  // 如果当前端口是 3000，使用相同端口
+  // 否则使用 3000 端口（服务器端口）
+  const currentPort = window.location.port;
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  
+  // 如果已经在 3000 端口，使用当前地址
+  if (currentPort === '3000' || (!currentPort && protocol === 'file:')) {
+    return `${protocol}//${hostname}:3000`;
   }
-  return `${window.location.protocol}//${window.location.hostname}:3000`;
+  
+  // 否则使用 3000 端口
+  return `${protocol}//${hostname}:3000`;
 })();
+
+// 在控制台显示 API 地址，方便调试
+console.log('API Base URL:', API_BASE_URL);
+console.log('Current URL:', window.location.href);
 
 const pose = new Pose({
   locateFile: (file) =>
@@ -359,6 +371,8 @@ async function deleteVideo(sessionId) {
 
 // 上传会话到服务器
 async function uploadSession(session, blob) {
+  console.log('Starting upload...', { sessionId: session.id, blobSize: blob.size, apiUrl: API_BASE_URL });
+  
   const formData = new FormData();
   formData.append('video', blob, `${session.id}.webm`);
   formData.append('sessionId', session.id);
@@ -368,17 +382,34 @@ async function uploadSession(session, blob) {
   formData.append('endTime', session.endTime);
   formData.append('durationMs', session.durationMs.toString());
 
-  const response = await fetch(`${API_BASE_URL}/api/upload`, {
-    method: 'POST',
-    body: formData
-  });
+  try {
+    console.log('Sending request to:', `${API_BASE_URL}/api/upload`);
+    const response = await fetch(`${API_BASE_URL}/api/upload`, {
+      method: 'POST',
+      body: formData
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-    throw new Error(error.error || 'Upload failed');
+    console.log('Response status:', response.status, response.statusText);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Upload failed:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch (e) {
+        error = { error: errorText || 'Upload failed' };
+      }
+      throw new Error(error.error || 'Upload failed');
+    }
+
+    const result = await response.json();
+    console.log('Upload successful:', result);
+    return result;
+  } catch (error) {
+    console.error('Upload error details:', error);
+    throw error;
   }
-
-  return await response.json();
 }
 
 // 从服务器获取所有会话（完全使用服务器，不使用本地存储）
