@@ -25,5 +25,7 @@ npm-debug.log*
 # Server files
 uploads/
 sessions.json
+data/
+*.db
 node_modules/
 
