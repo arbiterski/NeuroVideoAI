@@ -24,27 +24,31 @@ let recordingChunks = [];
 let poseActive = false;
 
 const sessionStorageKey = "poseSessions";
-// API 服务器地址 - 使用相同的主机名和协议，端口固定为 3000
-// 这样多台手机可以通过同一个服务器 IP 访问
+// API 服务器地址
+// 支持 Cloudflare Tunnel、ngrok 等代理服务
+// 直接使用当前 origin，让代理服务处理端口转发
 const API_BASE_URL = (() => {
-  const hostname = window.location.hostname || 'localhost';
-  const protocol = window.location.protocol;
-  
-  // 如果当前端口是 3000，直接使用当前 origin
-  if (window.location.port === '3000') {
+  // 如果是通过代理访问（没有端口或端口是 80/443），直接使用 origin
+  const port = window.location.port;
+  if (!port || port === '80' || port === '443') {
     return window.location.origin;
   }
   
-  // 否则使用当前主机名 + 端口 3000
-  // 这样手机 A 和手机 B 都会连接到同一个服务器
+  // 如果当前端口是 3000，直接使用当前 origin
+  if (port === '3000') {
+    return window.location.origin;
+  }
+  
+  // 本地开发时使用 3000 端口
+  const hostname = window.location.hostname || 'localhost';
+  const protocol = window.location.protocol;
   return `${protocol}//${hostname}:3000`;
 })();
 
 // 在控制台显示 API 地址，方便调试
-console.log('=== 多设备共享配置 ===');
+console.log('=== API 配置 ===');
 console.log('API Base URL:', API_BASE_URL);
 console.log('Current URL:', window.location.href);
-console.log('所有设备都会连接到同一个服务器:', API_BASE_URL);
 
 const pose = new Pose({
   locateFile: (file) =>
