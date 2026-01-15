@@ -77,13 +77,25 @@ tableBody?.addEventListener("click", async (event) => {
   if (!sessionId) return;
   if (action === "play") {
     try {
-      const blob = await fetchVideo(sessionId);
-      if (!blob) {
-        alert("找不到影片");
-        return;
-      }
-      previewVideo.src = URL.createObjectURL(blob);
-      previewVideo.play().catch(() => {});
+      // 直接使用 URL 串流播放，避免大檔案下載問題
+      const videoUrl = `${API_BASE_URL}/api/video/${sessionId}`;
+      console.log('Playing video from:', videoUrl);
+      
+      previewVideo.src = videoUrl;
+      previewVideo.load();
+      
+      previewVideo.onloadeddata = () => {
+        console.log('Video loaded successfully');
+        previewVideo.play().catch((e) => {
+          console.log('Autoplay blocked:', e);
+        });
+      };
+      
+      previewVideo.onerror = (e) => {
+        console.error('Video error:', e);
+        alert("影片載入失敗");
+      };
+      
     } catch (error) {
       console.error('Error playing video:', error);
       alert("載入影片失敗");

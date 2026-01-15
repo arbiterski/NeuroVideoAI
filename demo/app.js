@@ -284,15 +284,28 @@ tableBody?.addEventListener("click", async (event) => {
   if (action === "play") {
     try {
       updateStatus("正在載入影片...");
-      const blob = await fetchVideo(sessionId);
-      if (!blob) {
-        updateStatus("找不到影片");
-        return;
-      }
       if (!previewVideo) return;
-      previewVideo.src = URL.createObjectURL(blob);
-      previewVideo.play().catch(() => {});
-      updateStatus("");
+      
+      // 直接使用 URL 串流播放，避免大檔案下載問題
+      const videoUrl = `${API_BASE_URL}/api/video/${sessionId}`;
+      console.log('Playing video from:', videoUrl);
+      
+      previewVideo.src = videoUrl;
+      previewVideo.load();
+      
+      previewVideo.onloadeddata = () => {
+        console.log('Video loaded successfully');
+        updateStatus("");
+        previewVideo.play().catch((e) => {
+          console.log('Autoplay blocked:', e);
+        });
+      };
+      
+      previewVideo.onerror = (e) => {
+        console.error('Video error:', e);
+        updateStatus("影片載入失敗");
+      };
+      
     } catch (error) {
       console.error('Error playing video:', error);
       updateStatus("載入影片失敗");
@@ -453,10 +466,17 @@ async function fetchSessions() {
 // 从服务器获取视频（完全使用服务器）
 async function fetchVideo(sessionId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/video/${sessionId}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch video');
+    const url = `${API_BASE_URL}/api/video/${sessionId}`;
+    console.log('Fetching video from:', url);
+    
+    const response = await fetch(url);
+    
+    // 接受 200 OK 和 206 Partial Content
+    if (!response.ok && response.status !== 206) {
+      throw new Error(`Failed to fetch video: ${response.status}`);
     }
+    
+    console.log('Video response status:', response.status);
     return await response.blob();
   } catch (error) {
     console.error('Error fetching video:', error);
