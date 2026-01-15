@@ -95,31 +95,60 @@ startCameraButton?.addEventListener("click", async () => {
   }
 
   try {
-    // 先检查权限状态
+    // 先检查权限状态（Chrome 和 Safari 兼容方式）
     if (navigator.permissions) {
       try {
-        const permissionStatus = await navigator.permissions.query({ name: 'camera' });
-        if (permissionStatus.state === 'denied') {
+        // Chrome 使用 'camera'，Safari 可能不支持，所以用 try-catch
+        let permissionStatus;
+        try {
+          permissionStatus = await navigator.permissions.query({ name: 'camera' });
+        } catch (e) {
+          // Safari 可能不支持，尝试其他方式
+          try {
+            permissionStatus = await navigator.permissions.query({ name: 'camera', allowWithoutGesture: false });
+          } catch (e2) {
+            // 如果都不支持，直接继续尝试 getUserMedia
+            permissionStatus = null;
+          }
+        }
+        
+        if (permissionStatus && permissionStatus.state === 'denied') {
           updateStatus("攝影機權限已被拒絕，請在瀏覽器設定中允許");
-          alert("攝影機權限已被拒絕。\n\n請在瀏覽器設定中允許攝影機權限，然後重新載入頁面。");
+          alert("攝影機權限已被拒絕。\n\n請在瀏覽器設定中允許攝影機權限，然後重新載入頁面。\n\nChrome: 點擊地址欄鎖頭圖示 → 網站設定 → 允許攝影機");
           return;
         }
       } catch (e) {
         // 某些浏览器不支持 permissions API，继续尝试
+        console.log('Permissions API not supported, continuing...');
       }
     }
 
     updateStatus("正在請求攝影機權限...");
     
-    // 请求权限，使用更详细的配置
-    mediaStream = await navigator.mediaDevices.getUserMedia({
+    // 请求权限 - 使用更兼容的配置
+    // 先尝试理想配置
+    let constraints = {
       video: {
         facingMode: { ideal: "user" },
         width: { ideal: 1280 },
         height: { ideal: 720 }
       },
       audio: false,
-    });
+    };
+    
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (firstError) {
+      // 如果失败，尝试更简单的配置（Chrome 可能对某些约束更严格）
+      console.log('First attempt failed, trying simpler constraints:', firstError);
+      constraints = {
+        video: {
+          facingMode: "user"
+        },
+        audio: false,
+      };
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    }
     
     cameraVideo.srcObject = mediaStream;
     await cameraVideo.play();
@@ -252,8 +281,6 @@ tableBody?.addEventListener("click", async (event) => {
     try {
       updateStatus("正在刪除...");
       await deleteSessionFromServer(sessionId);
-      // 同时删除本地备份
-      await deleteSession(sessionId);
       await loadRecords();
       updateStatus("已刪除");
     } catch (error) {
@@ -354,22 +381,24 @@ async function uploadSession(session, blob) {
   return await response.json();
 }
 
-// 从服务器获取所有会话
+// 从服务器获取所有会话（完全使用服务器，不使用本地存储）
 async function fetchSessions() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/sessions`);
     if (!response.ok) {
       throw new Error('Failed to fetch sessions');
     }
-    return await response.json();
+    const sessions = await response.json();
+    return sessions || [];
   } catch (error) {
     console.error('Error fetching sessions:', error);
-    // 如果服务器不可用，返回本地存储的会话
-    return loadSessions();
+    // 服务器不可用时返回空数组，不返回本地存储
+    alert('無法連接到伺服器，請檢查網路連線');
+    return [];
   }
 }
 
-// 从服务器获取视频
+// 从服务器获取视频（完全使用服务器）
 async function fetchVideo(sessionId) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/video/${sessionId}`);
@@ -379,8 +408,7 @@ async function fetchVideo(sessionId) {
     return await response.blob();
   } catch (error) {
     console.error('Error fetching video:', error);
-    // 如果服务器不可用，尝试从本地获取
-    return await getVideo(sessionId);
+    throw new Error('無法從伺服器載入影片，請檢查網路連線');
   }
 }
 
@@ -400,12 +428,10 @@ async function deleteSessionFromServer(sessionId) {
   }
 }
 
+// 不再使用本地存储，所有数据都在服务器
 async function saveSession(session, blob) {
-  // 保留本地存储作为备份
-  await saveVideo(session.id, blob);
-  const sessions = loadSessions();
-  sessions.push(session);
-  localStorage.setItem(sessionStorageKey, JSON.stringify(sessions));
+  // 只上传到服务器，不使用本地存储
+  await uploadSession(session, blob);
 }
 
 function loadSessions() {

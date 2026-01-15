@@ -38,26 +38,46 @@ const upload = multer({
 
 // 存储会话信息的文件
 const sessionsFile = path.join(__dirname, 'sessions.json');
+let sessionsCache = null;
+let sessionsLock = false;
 
+// 使用文件锁机制确保并发安全
 function loadSessions() {
   try {
     if (fs.existsSync(sessionsFile)) {
       const data = fs.readFileSync(sessionsFile, 'utf8');
-      return JSON.parse(data);
+      const sessions = JSON.parse(data);
+      sessionsCache = sessions;
+      return sessions;
     }
   } catch (error) {
     console.error('Error loading sessions:', error);
   }
+  sessionsCache = [];
   return [];
 }
 
 function saveSessions(sessions) {
+  // 简单的锁机制，避免并发写入冲突
+  if (sessionsLock) {
+    // 如果正在写入，等待一下再重试
+    setTimeout(() => saveSessions(sessions), 100);
+    return;
+  }
+  
   try {
+    sessionsLock = true;
     fs.writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2), 'utf8');
+    sessionsCache = sessions;
   } catch (error) {
     console.error('Error saving sessions:', error);
+  } finally {
+    sessionsLock = false;
   }
 }
+
+// 初始化时加载会话
+loadSessions();
 
 // 静态文件服务 - 提供 demo 文件夹
 app.use(express.static(path.join(__dirname, 'demo')));
@@ -81,8 +101,15 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
       size: req.file.size
     };
 
+    // 重新加载以确保获取最新数据（多设备共享）
     const sessions = loadSessions();
-    sessions.push(session);
+    // 检查是否已存在（避免重复）
+    const existingIndex = sessions.findIndex(s => s.id === session.id);
+    if (existingIndex >= 0) {
+      sessions[existingIndex] = session;
+    } else {
+      sessions.push(session);
+    }
     saveSessions(sessions);
 
     res.json({
@@ -96,9 +123,10 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
   }
 });
 
-// 获取所有会话
+// 获取所有会话（从缓存读取，提高性能）
 app.get('/api/sessions', (req, res) => {
   try {
+    // 重新加载以确保数据最新（多设备共享时重要）
     const sessions = loadSessions();
     // 不返回文件路径，只返回元数据
     const sessionsData = sessions.map(s => ({
@@ -110,6 +138,8 @@ app.get('/api/sessions', (req, res) => {
       durationMs: s.durationMs,
       size: s.size
     }));
+    // 按时间倒序排列（最新的在前）
+    sessionsData.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
     res.json(sessionsData);
   } catch (error) {
     console.error('Error fetching sessions:', error);
@@ -141,6 +171,7 @@ app.get('/api/video/:sessionId', (req, res) => {
 // 删除会话
 app.delete('/api/sessions/:sessionId', (req, res) => {
   try {
+    // 重新加载以确保获取最新数据（多设备共享）
     const sessions = loadSessions();
     const sessionIndex = sessions.findIndex(s => s.id === req.params.sessionId);
     
@@ -152,7 +183,12 @@ app.delete('/api/sessions/:sessionId', (req, res) => {
     
     // 删除文件
     if (session.filepath && fs.existsSync(session.filepath)) {
-      fs.unlinkSync(session.filepath);
+      try {
+        fs.unlinkSync(session.filepath);
+      } catch (fileError) {
+        console.error('Error deleting file:', fileError);
+        // 即使文件删除失败，也继续删除记录
+      }
     }
 
     // 从列表中删除

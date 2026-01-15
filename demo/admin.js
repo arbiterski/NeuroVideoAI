@@ -49,31 +49,10 @@ async function loadRecords() {
     }
   } catch (error) {
     console.error('Error loading records:', error);
-    // 如果服务器不可用，使用本地存储
-    const sessions = loadSessions();
-    recordCountLabel.textContent = String(sessions.length);
-    tableBody.innerHTML = "";
-    if (sessions.length === 0) {
-      table.hidden = true;
-      emptyState.hidden = false;
-      return;
-    }
-    table.hidden = false;
-    emptyState.hidden = true;
-    for (const session of sessions) {
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${formatDate(session.startTime)}</td>
-        <td>${session.patientId}</td>
-        <td>${formatAssessment(session.assessment)}</td>
-        <td>${formatDuration(session.durationMs)}</td>
-        <td class="table-actions">
-          <button data-action="play" data-id="${session.id}">播放</button>
-          <button data-action="delete" data-id="${session.id}">刪除</button>
-        </td>
-      `;
-      tableBody.appendChild(row);
-    }
+    recordCountLabel.textContent = "0";
+    table.hidden = true;
+    emptyState.hidden = false;
+    emptyState.textContent = "無法載入紀錄，請檢查網路連線";
   }
 }
 
@@ -102,8 +81,6 @@ tableBody?.addEventListener("click", async (event) => {
     if (!confirm("確定要刪除此紀錄嗎？")) return;
     try {
       await deleteSessionFromServer(sessionId);
-      // 同时删除本地备份
-      await deleteSession(sessionId);
       await loadRecords();
     } catch (error) {
       console.error('Error deleting session:', error);
@@ -176,22 +153,24 @@ async function deleteVideo(sessionId) {
   });
 }
 
-// 从服务器获取所有会话
+// 从服务器获取所有会话（完全使用服务器）
 async function fetchSessions() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/sessions`);
     if (!response.ok) {
       throw new Error('Failed to fetch sessions');
     }
-    return await response.json();
+    const sessions = await response.json();
+    return sessions || [];
   } catch (error) {
     console.error('Error fetching sessions:', error);
-    // 如果服务器不可用，返回本地存储的会话
-    return loadSessions();
+    // 服务器不可用时返回空数组
+    alert('無法連接到伺服器，請檢查網路連線');
+    return [];
   }
 }
 
-// 从服务器获取视频
+// 从服务器获取视频（完全使用服务器）
 async function fetchVideo(sessionId) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/video/${sessionId}`);
@@ -201,8 +180,7 @@ async function fetchVideo(sessionId) {
     return await response.blob();
   } catch (error) {
     console.error('Error fetching video:', error);
-    // 如果服务器不可用，尝试从本地获取
-    return await getVideo(sessionId);
+    throw new Error('無法從伺服器載入影片，請檢查網路連線');
   }
 }
 
