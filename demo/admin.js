@@ -6,14 +6,22 @@ const emptyState = document.getElementById("empty-state");
 const previewVideo = document.getElementById("preview-video");
 
 const sessionStorageKey = "poseSessions";
-// API 服务器地址
+// API 服务器地址 - 使用相同的主机名和协议，端口固定为 3000
+// 这样多台手机可以通过同一个服务器 IP 访问
 const API_BASE_URL = (() => {
-  const port = window.location.port;
-  if (port && port !== '8000') {
-    return `${window.location.protocol}//${window.location.hostname}:${port}`;
+  const hostname = window.location.hostname || 'localhost';
+  const protocol = window.location.protocol;
+  
+  // 如果当前端口是 3000，直接使用当前 origin
+  if (window.location.port === '3000') {
+    return window.location.origin;
   }
-  return `${window.location.protocol}//${window.location.hostname}:3000`;
+  
+  // 否则使用当前主机名 + 端口 3000
+  return `${protocol}//${hostname}:3000`;
 })();
+
+console.log('Admin API Base URL:', API_BASE_URL);
 
 refreshButton?.addEventListener("click", () => {
   loadRecords();

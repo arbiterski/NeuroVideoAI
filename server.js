@@ -222,6 +222,19 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 服务器状态 - 用于确认多设备连接到同一服务器
+app.get('/api/status', (req, res) => {
+  const sessions = loadSessions();
+  res.json({
+    status: 'ok',
+    serverTime: new Date().toISOString(),
+    totalSessions: sessions.length,
+    uploadsDir: uploadsDir,
+    clientIP: req.ip || req.connection.remoteAddress,
+    message: '所有连接到此服务器的设备共享同一个数据库'
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Uploads directory: ${uploadsDir}`);
