@@ -22,3 +22,8 @@ npm-debug.log*
 *.tmp
 *.temp
 
+# Server files
+uploads/
+sessions.json
+node_modules/
+

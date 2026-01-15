@@ -24,6 +24,14 @@ let recordingChunks = [];
 let poseActive = false;
 
 const sessionStorageKey = "poseSessions";
+// API 服务器地址 - 如果前端和服务器在同一端口，使用相同端口；否则使用 3000
+const API_BASE_URL = (() => {
+  const port = window.location.port;
+  if (port && port !== '8000') {
+    return `${window.location.protocol}//${window.location.hostname}:${port}`;
+  }
+  return `${window.location.protocol}//${window.location.hostname}:3000`;
+})();
 
 const pose = new Pose({
   locateFile: (file) =>
@@ -71,17 +79,86 @@ instructionInput?.addEventListener("change", (event) => {
 
 startCameraButton?.addEventListener("click", async () => {
   if (mediaStream) return;
+  
+  // 检查是否支持 getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    updateStatus("您的瀏覽器不支援攝影機功能");
+    alert("您的瀏覽器不支援攝影機功能。請使用 Chrome、Safari 或 Firefox 最新版本。");
+    return;
+  }
+
+  // 检查协议（HTTPS 或 localhost）
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    updateStatus("需要 HTTPS 連線才能使用攝影機");
+    alert("為了使用攝影機功能，請使用 HTTPS 連線或 localhost。\n\n如果您在手機上，請確保使用 HTTPS 連線。");
+    return;
+  }
+
   try {
+    // 先检查权限状态
+    if (navigator.permissions) {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+        if (permissionStatus.state === 'denied') {
+          updateStatus("攝影機權限已被拒絕，請在瀏覽器設定中允許");
+          alert("攝影機權限已被拒絕。\n\n請在瀏覽器設定中允許攝影機權限，然後重新載入頁面。");
+          return;
+        }
+      } catch (e) {
+        // 某些浏览器不支持 permissions API，继续尝试
+      }
+    }
+
+    updateStatus("正在請求攝影機權限...");
+    
+    // 请求权限，使用更详细的配置
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
+      video: {
+        facingMode: { ideal: "user" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
       audio: false,
     });
+    
     cameraVideo.srcObject = mediaStream;
     await cameraVideo.play();
     startPoseLoop();
     updateStatus("攝影機已開啟，尚未開始錄影");
   } catch (error) {
-    updateStatus("無法開啟攝影機，請檢查權限");
+    console.error('Camera error:', error);
+    let errorMessage = "無法開啟攝影機";
+    
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      errorMessage = "攝影機權限被拒絕，請在瀏覽器設定中允許";
+      alert("攝影機權限被拒絕。\n\n請點擊瀏覽器地址欄的鎖頭圖示，允許攝影機權限，然後重新載入頁面。");
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      errorMessage = "找不到攝影機裝置";
+      alert("找不到攝影機裝置。請確認您的裝置有攝影機，並且沒有被其他應用程式使用。");
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      errorMessage = "攝影機被其他應用程式使用中";
+      alert("攝影機目前被其他應用程式使用中。請關閉其他使用攝影機的應用程式，然後重試。");
+    } else if (error.name === 'OverconstrainedError') {
+      errorMessage = "攝影機不支援要求的設定";
+      // 尝试使用更简单的配置
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false,
+        });
+        cameraVideo.srcObject = mediaStream;
+        await cameraVideo.play();
+        startPoseLoop();
+        updateStatus("攝影機已開啟，尚未開始錄影");
+        return;
+      } catch (retryError) {
+        console.error('Retry error:', retryError);
+      }
+    } else {
+      errorMessage = `無法開啟攝影機: ${error.message}`;
+    }
+    
+    updateStatus(errorMessage);
   }
 });
 
@@ -106,18 +183,27 @@ startRecordingButton?.addEventListener("click", () => {
     }
   };
   recorder.onstop = async () => {
-    const blob = new Blob(recordingChunks, { type: "video/webm" });
-    const sessionId = crypto.randomUUID();
-    const session = {
-      id: sessionId,
-      patientId: patientIdInput.value.trim(),
-      assessment: assessmentSelect.value,
-      startTime: new Date(recordingStartTime).toISOString(),
-      endTime: new Date().toISOString(),
-      durationMs: Date.now() - recordingStartTime,
-    };
-    await saveSession(session, blob);
-    updateStatus("錄影已儲存，請到管理介面檢視");
+    try {
+      updateStatus("正在處理錄影...");
+      const blob = new Blob(recordingChunks, { type: "video/webm" });
+      const sessionId = crypto.randomUUID();
+      const session = {
+        id: sessionId,
+        patientId: patientIdInput.value.trim(),
+        assessment: assessmentSelect.value,
+        startTime: new Date(recordingStartTime).toISOString(),
+        endTime: new Date().toISOString(),
+        durationMs: Date.now() - recordingStartTime,
+      };
+      
+      // 上传到服务器
+      await uploadSession(session, blob);
+      updateStatus("錄影已上傳到伺服器，請到管理介面檢視");
+    } catch (error) {
+      console.error('Upload error:', error);
+      updateStatus("上傳失敗，請檢查網路連線");
+      alert("上傳錄影失敗。請檢查網路連線並重試。\n\n錯誤: " + error.message);
+    }
   };
   recordingStartTime = Date.now();
   recorder.start();
@@ -144,16 +230,37 @@ tableBody?.addEventListener("click", async (event) => {
   const sessionId = button.dataset.id;
   if (!sessionId) return;
   if (action === "play") {
-    const blob = await getVideo(sessionId);
-    if (!blob) return;
-    if (!previewVideo) return;
-    previewVideo.src = URL.createObjectURL(blob);
-    previewVideo.play().catch(() => {});
+    try {
+      updateStatus("正在載入影片...");
+      const blob = await fetchVideo(sessionId);
+      if (!blob) {
+        updateStatus("找不到影片");
+        return;
+      }
+      if (!previewVideo) return;
+      previewVideo.src = URL.createObjectURL(blob);
+      previewVideo.play().catch(() => {});
+      updateStatus("");
+    } catch (error) {
+      console.error('Error playing video:', error);
+      updateStatus("載入影片失敗");
+    }
     return;
   }
   if (action === "delete") {
-    await deleteSession(sessionId);
-    loadRecords();
+    if (!confirm("確定要刪除此紀錄嗎？")) return;
+    try {
+      updateStatus("正在刪除...");
+      await deleteSessionFromServer(sessionId);
+      // 同时删除本地备份
+      await deleteSession(sessionId);
+      await loadRecords();
+      updateStatus("已刪除");
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      updateStatus("刪除失敗");
+      alert("刪除失敗，請重試");
+    }
   }
 });
 
@@ -223,7 +330,78 @@ async function deleteVideo(sessionId) {
   });
 }
 
+// 上传会话到服务器
+async function uploadSession(session, blob) {
+  const formData = new FormData();
+  formData.append('video', blob, `${session.id}.webm`);
+  formData.append('sessionId', session.id);
+  formData.append('patientId', session.patientId);
+  formData.append('assessment', session.assessment);
+  formData.append('startTime', session.startTime);
+  formData.append('endTime', session.endTime);
+  formData.append('durationMs', session.durationMs.toString());
+
+  const response = await fetch(`${API_BASE_URL}/api/upload`, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+    throw new Error(error.error || 'Upload failed');
+  }
+
+  return await response.json();
+}
+
+// 从服务器获取所有会话
+async function fetchSessions() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sessions`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch sessions');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching sessions:', error);
+    // 如果服务器不可用，返回本地存储的会话
+    return loadSessions();
+  }
+}
+
+// 从服务器获取视频
+async function fetchVideo(sessionId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/video/${sessionId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch video');
+    }
+    return await response.blob();
+  } catch (error) {
+    console.error('Error fetching video:', error);
+    // 如果服务器不可用，尝试从本地获取
+    return await getVideo(sessionId);
+  }
+}
+
+// 删除服务器上的会话
+async function deleteSessionFromServer(sessionId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete session');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    throw error;
+  }
+}
+
 async function saveSession(session, blob) {
+  // 保留本地存储作为备份
   await saveVideo(session.id, blob);
   const sessions = loadSessions();
   sessions.push(session);
@@ -240,31 +418,39 @@ function loadSessions() {
   }
 }
 
-function loadRecords() {
+async function loadRecords() {
   if (!recordCountLabel || !tableBody || !table || !emptyState) return;
-  const sessions = loadSessions();
-  recordCountLabel.textContent = String(sessions.length);
-  tableBody.innerHTML = "";
-  if (sessions.length === 0) {
-    table.hidden = true;
-    emptyState.hidden = false;
-    return;
-  }
-  table.hidden = false;
-  emptyState.hidden = true;
-  for (const session of sessions) {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${formatDate(session.startTime)}</td>
-      <td>${session.patientId}</td>
-      <td>${formatAssessment(session.assessment)}</td>
-      <td>${formatDuration(session.durationMs)}</td>
-      <td class="table-actions">
-        <button data-action="play" data-id="${session.id}">播放</button>
-        <button data-action="delete" data-id="${session.id}">刪除</button>
-      </td>
-    `;
-    tableBody.appendChild(row);
+  
+  try {
+    updateStatus("正在載入紀錄...");
+    const sessions = await fetchSessions();
+    recordCountLabel.textContent = String(sessions.length);
+    tableBody.innerHTML = "";
+    if (sessions.length === 0) {
+      table.hidden = true;
+      emptyState.hidden = false;
+      return;
+    }
+    table.hidden = false;
+    emptyState.hidden = true;
+    for (const session of sessions) {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${formatDate(session.startTime)}</td>
+        <td>${session.patientId}</td>
+        <td>${formatAssessment(session.assessment)}</td>
+        <td>${formatDuration(session.durationMs)}</td>
+        <td class="table-actions">
+          <button data-action="play" data-id="${session.id}">播放</button>
+          <button data-action="delete" data-id="${session.id}">刪除</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    }
+    updateStatus("");
+  } catch (error) {
+    console.error('Error loading records:', error);
+    updateStatus("載入紀錄失敗");
   }
 }
 
