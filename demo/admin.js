@@ -168,17 +168,27 @@ async function deleteVideo(sessionId) {
 
 // 从服务器获取所有会话（完全使用服务器）
 async function fetchSessions() {
+  const url = `${API_BASE_URL}/api/sessions`;
+  console.log('Fetching sessions from:', url);
+  
   try {
-    const response = await fetch(`${API_BASE_URL}/api/sessions`);
+    const response = await fetch(url);
+    console.log('Response status:', response.status, response.statusText);
+    
     if (!response.ok) {
-      throw new Error('Failed to fetch sessions');
+      const errorText = await response.text();
+      console.error('Server error:', errorText);
+      throw new Error(`Failed to fetch sessions: ${response.status}`);
     }
+    
     const sessions = await response.json();
+    console.log('Fetched sessions:', sessions.length, 'records');
     return sessions || [];
   } catch (error) {
     console.error('Error fetching sessions:', error);
+    console.error('API URL was:', url);
     // 服务器不可用时返回空数组
-    alert('無法連接到伺服器，請檢查網路連線');
+    alert('無法連接到伺服器，請檢查網路連線\n\nAPI URL: ' + url + '\n\n錯誤: ' + error.message);
     return [];
   }
 }
