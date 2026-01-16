@@ -105,12 +105,12 @@ const dbOperations = {
   `)
 };
 
-// 靜態檔案服務 - 提供 demo 資料夾
-app.use(express.static(path.join(__dirname, 'demo')));
+// 靜態檔案服務 - 提供當前資料夾
+app.use(express.static(__dirname));
 
 // 根路徑重定向到 index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'demo', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // 上傳錄影檔案
