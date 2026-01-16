@@ -4,121 +4,122 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="theme-color" content="#0066cc" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#1a1a2e" />
+    <meta name="screen-orientation" content="landscape" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
-    <title>運動姿態紀錄</title>
+    <title>運動姿態紀錄 v3</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   </head>
   <body>
-    <header class="app-header">
-      <div>
-        <h1>運動姿態紀錄</h1>
-        <p>影像與資料儲存在伺服器，支援多裝置共享。</p>
-      </div>
-      <div class="header-actions">
-        <div class="tabs" role="tablist">
-          <button class="tab-button active" data-view="recording" role="tab">
-            錄影
-          </button>
-          <button class="tab-button" data-view="admin" role="tab">
-            管理
-          </button>
+    <!-- 錄影介面 -->
+    <div id="recording-view" class="view active">
+      <header class="topbar">
+        <h1>運動姿態紀錄 v3</h1>
+        <div class="tabs">
+          <button class="tab-button active" data-view="recording">錄影</button>
+          <button class="tab-button" data-view="admin">管理</button>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <main>
-      <section id="recording-view" class="view active">
-        <div class="layout">
-          <section class="panel">
-            <div class="panel-header">
-              <h2>指導影片</h2>
-              <label class="file-picker">
-                選擇影片
-                <input id="instruction-file" type="file" accept="video/*" />
-              </label>
-            </div>
+      <main class="recording-layout">
+        <!-- 左側：指導影片 -->
+        <section class="video-panel">
+          <div class="panel-label">
+            <span>指導影片</span>
+            <label class="file-picker">
+              選擇
+              <input id="instruction-file" type="file" accept="video/*" />
+            </label>
+          </div>
+          <div class="video-container">
             <video id="instruction-video" controls playsinline></video>
-          </section>
+          </div>
+        </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <h2>病人攝影機</h2>
-              <div class="panel-actions">
-                <button id="start-camera" class="primary">開啟攝影機</button>
-                <button id="start-recording">開始錄影</button>
-                <button id="stop-recording" disabled>停止並儲存</button>
-              </div>
+        <!-- 中間：攝影機畫面 -->
+        <section class="camera-panel">
+          <div class="panel-label">
+            <span>病人攝影機</span>
+            <span id="recording-indicator" class="indicator"></span>
+          </div>
+          <div class="camera-container">
+            <video id="camera-video" playsinline muted></video>
+            <canvas id="camera-canvas"></canvas>
+            <div id="camera-overlay" class="camera-overlay">
+              <button id="start-camera" class="overlay-btn">開啟攝影機</button>
             </div>
+          </div>
+        </section>
 
-            <div class="camera-frame">
-              <video id="camera-video" playsinline muted></video>
-              <canvas id="camera-canvas"></canvas>
-            </div>
+        <!-- 右側：控制面板 -->
+        <section class="control-panel">
+          <div class="control-section">
+            <label class="input-group">
+              <span>身分證字號</span>
+              <input id="patient-id" type="text" autocomplete="off" placeholder="請輸入" required />
+            </label>
+            <label class="input-group">
+              <span>今日狀況</span>
+              <select id="patient-assessment">
+                <option value="good">今天狀況很好</option>
+                <option value="issue">今天走路會有問題</option>
+                <option value="poor">走路非常不好</option>
+              </select>
+            </label>
+          </div>
 
-            <form id="session-form" class="session-form">
-              <label>
-                病人身分證字號
-                <input
-                  id="patient-id"
-                  type="text"
-                  autocomplete="off"
-                  required
-                />
-              </label>
-              <label>
-                今日狀況
-                <select id="patient-assessment">
-                  <option value="good">今天狀況很好</option>
-                  <option value="issue">今天走路會有問題</option>
-                  <option value="poor">走路非常不好</option>
-                </select>
-              </label>
-              <div class="status">
-                <span id="recording-status">尚未開始錄影</span>
-              </div>
-            </form>
-          </section>
+          <div class="control-actions">
+            <button id="start-recording" class="btn-record">開始錄影</button>
+            <button id="stop-recording" class="btn-stop" disabled>停止並儲存</button>
+          </div>
+
+          <div class="status-bar">
+            <span id="recording-status">尚未開始錄影</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- 管理介面 -->
+    <div id="admin-view" class="view">
+      <header class="topbar">
+        <h1>管理介面</h1>
+        <div class="tabs">
+          <button class="tab-button" data-view="recording">錄影</button>
+          <button class="tab-button active" data-view="admin">管理</button>
         </div>
-      </section>
+      </header>
 
-      <section id="admin-view" class="view">
-        <div class="admin-layout">
-          <section class="summary-card">
-            <div>
-              <h2>紀錄總數</h2>
-              <p id="record-count">0</p>
+      <main class="admin-layout">
+        <!-- 左側：紀錄列表 -->
+        <section class="records-panel">
+          <div class="panel-label">
+            <span>病人紀錄</span>
+            <div class="label-actions">
+              <span class="record-badge"><span id="record-count">0</span> 筆</span>
+              <button id="refresh-list" class="btn-icon">重整</button>
             </div>
-            <button id="refresh-list">重新整理</button>
-          </section>
-
-          <section class="panel">
-            <h2>病人紀錄</h2>
+          </div>
+          <div class="records-list" id="records-list">
             <div id="empty-state" class="empty-state">尚無紀錄</div>
-            <table class="records-table" id="records-table" hidden>
-              <thead>
-                <tr>
-                  <th>時間</th>
-                  <th>身分證字號</th>
-                  <th>評估</th>
-                  <th>長度</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="records-body"></tbody>
-            </table>
-          </section>
+            <div id="records-body"></div>
+          </div>
+        </section>
 
-          <section class="panel">
-            <h2>影片回放</h2>
-            <video id="preview-video" class="video-preview" controls></video>
-          </section>
-        </div>
-      </section>
-    </main>
+        <!-- 右側：影片回放 -->
+        <section class="preview-panel">
+          <div class="panel-label">
+            <span>影片回放</span>
+          </div>
+          <div class="preview-container">
+            <video id="preview-video" controls playsinline></video>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <script src="./app.js"></script>
   </body>

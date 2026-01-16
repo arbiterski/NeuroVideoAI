@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#0066cc" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+    <title>運動姿態紀錄</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>運動姿態紀錄</h1>
+        <p>影像與資料儲存在伺服器，支援多裝置共享。</p>
+      </div>
+      <div class="header-actions">
+        <div class="tabs" role="tablist">
+          <button class="tab-button active" data-view="recording" role="tab">
+            錄影
+          </button>
+          <button class="tab-button" data-view="admin" role="tab">
+            管理
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="recording-view" class="view active">
+        <div class="layout">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>指導影片</h2>
+              <label class="file-picker">
+                選擇影片
+                <input id="instruction-file" type="file" accept="video/*" />
+              </label>
+            </div>
+            <video id="instruction-video" controls playsinline></video>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>病人攝影機</h2>
+              <div class="panel-actions">
+                <button id="start-camera" class="primary">開啟攝影機</button>
+                <button id="start-recording">開始錄影</button>
+                <button id="stop-recording" disabled>停止並儲存</button>
+              </div>
+            </div>
+
+            <div class="camera-frame">
+              <video id="camera-video" playsinline muted></video>
+              <canvas id="camera-canvas"></canvas>
+            </div>
+
+            <form id="session-form" class="session-form">
+              <label>
+                病人身分證字號
+                <input
+                  id="patient-id"
+                  type="text"
+                  autocomplete="off"
+                  required
+                />
+              </label>
+              <label>
+                今日狀況
+                <select id="patient-assessment">
+                  <option value="good">今天狀況很好</option>
+                  <option value="issue">今天走路會有問題</option>
+                  <option value="poor">走路非常不好</option>
+                </select>
+              </label>
+              <div class="status">
+                <span id="recording-status">尚未開始錄影</span>
+              </div>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section id="admin-view" class="view">
+        <div class="admin-layout">
+          <section class="summary-card">
+            <div>
+              <h2>紀錄總數</h2>
+              <p id="record-count">0</p>
+            </div>
+            <button id="refresh-list">重新整理</button>
+          </section>
+
+          <section class="panel">
+            <h2>病人紀錄</h2>
+            <div id="empty-state" class="empty-state">尚無紀錄</div>
+            <table class="records-table" id="records-table" hidden>
+              <thead>
+                <tr>
+                  <th>時間</th>
+                  <th>身分證字號</th>
+                  <th>評估</th>
+                  <th>長度</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="records-body"></tbody>
+            </table>
+          </section>
+
+          <section class="panel">
+            <h2>影片回放</h2>
+            <video id="preview-video" class="video-preview" controls></video>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
