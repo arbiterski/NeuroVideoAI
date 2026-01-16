@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#0066cc" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+    <title>管理介面 - 運動姿態紀錄</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>管理介面</h1>
+        <p>瀏覽本機已儲存的病人紀錄。</p>
+      </div>
+      <a class="link-button" href="./index.html">回到錄影</a>
+    </header>
+
+    <main class="admin-layout">
+      <section class="summary-card">
+        <div>
+          <h2>紀錄總數</h2>
+          <p id="record-count">0</p>
+        </div>
+        <button id="refresh-list">重新整理</button>
+      </section>
+
+      <section class="panel">
+        <h2>病人紀錄</h2>
+        <div id="empty-state" class="empty-state">尚無紀錄</div>
+        <table class="records-table" id="records-table" hidden>
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>身分證字號</th>
+              <th>評估</th>
+              <th>長度</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="records-body"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>影片回放</h2>
+        <video id="preview-video" class="video-preview" controls></video>
+      </section>
+    </main>
+
+    <script src="./admin.js"></script>
+  </body>
+</html>
