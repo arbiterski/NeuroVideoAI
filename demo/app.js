@@ -1,6 +1,9 @@
 // DOM Elements
 const instructionInput = document.getElementById("instruction-file");
 const instructionVideo = document.getElementById("instruction-video");
+const instructionCanvas = document.getElementById("instruction-canvas");
+const instructionOverlay = document.getElementById("instruction-overlay");
+const instructionOpacity = document.getElementById("instruction-opacity");
 const cameraVideo = document.getElementById("camera-video");
 const cameraCanvas = document.getElementById("camera-canvas");
 const cameraOverlay = document.getElementById("camera-overlay");
@@ -24,6 +27,7 @@ let mediaStream = null;
 let recorder = null;
 let recordingChunks = [];
 let poseActive = false;
+let instructionPoseActive = false;
 
 const sessionStorageKey = "poseSessions";
 
@@ -101,6 +105,47 @@ pose.onResults((results) => {
   ctx.restore();
 });
 
+// MediaPipe Pose for instruction video
+const instructionPose = new Pose({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+});
+
+instructionPose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  enableSegmentation: false,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6,
+});
+
+instructionPose.onResults((results) => {
+  if (!instructionCanvas) return;
+  const ctx = instructionCanvas.getContext("2d");
+  if (!ctx) return;
+  
+  if (instructionCanvas.width !== instructionVideo.videoWidth) {
+    instructionCanvas.width = instructionVideo.videoWidth;
+    instructionCanvas.height = instructionVideo.videoHeight;
+  }
+  
+  ctx.save();
+  ctx.clearRect(0, 0, instructionCanvas.width, instructionCanvas.height);
+  
+  if (results.poseLandmarks) {
+    // Draw reference pose with different color (yellow/orange)
+    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
+      color: "#ffa502",
+      lineWidth: 4,
+    });
+    drawLandmarks(ctx, results.poseLandmarks, {
+      color: "#ff6b6b",
+      lineWidth: 2,
+      radius: 5,
+    });
+  }
+  ctx.restore();
+});
+
 // Initialize
 initNavigation();
 
@@ -109,7 +154,25 @@ instructionInput?.addEventListener("change", (event) => {
   const [file] = event.target.files;
   if (!file) return;
   instructionVideo.src = URL.createObjectURL(file);
+  
+  instructionVideo.onloadeddata = () => {
+    // Hide overlay
+    if (instructionOverlay) {
+      instructionOverlay.classList.add("hidden");
+    }
+    // Start pose detection on instruction video
+    startInstructionPoseLoop();
+  };
+  
   instructionVideo.play().catch(() => {});
+});
+
+// Opacity slider handler
+instructionOpacity?.addEventListener("input", (event) => {
+  const opacity = event.target.value / 100;
+  if (instructionVideo) {
+    instructionVideo.style.opacity = opacity;
+  }
 });
 
 startCameraButton?.addEventListener("click", async () => {
@@ -331,6 +394,23 @@ function stopPoseLoop() {
   poseActive = false;
 }
 
+function startInstructionPoseLoop() {
+  if (instructionPoseActive) return;
+  instructionPoseActive = true;
+  const loop = async () => {
+    if (!instructionPoseActive) return;
+    if (instructionVideo && instructionVideo.readyState >= 2 && !instructionVideo.paused) {
+      await instructionPose.send({ image: instructionVideo });
+    }
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function stopInstructionPoseLoop() {
+  instructionPoseActive = false;
+}
+
 function getRecorderOptions() {
   const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
   for (const type of types) {
@@ -483,12 +563,16 @@ function setActiveView(view) {
   
   if (isAdmin) {
     stopPoseLoop();
+    stopInstructionPoseLoop();
     loadRecords();
     window.location.hash = "admin";
   } else {
     window.location.hash = "";
     if (mediaStream) {
       startPoseLoop();
+    }
+    if (instructionVideo && instructionVideo.src) {
+      startInstructionPoseLoop();
     }
   }
 }

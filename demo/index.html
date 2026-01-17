@@ -29,13 +29,22 @@
         <section class="video-panel">
           <div class="panel-label">
             <span>指導影片</span>
-            <label class="file-picker">
-              選擇
-              <input id="instruction-file" type="file" accept="video/*" />
-            </label>
+            <div class="label-actions">
+              <label class="opacity-slider">
+                <input id="instruction-opacity" type="range" min="0" max="100" value="60" />
+              </label>
+              <label class="file-picker">
+                選擇
+                <input id="instruction-file" type="file" accept="video/*" />
+              </label>
+            </div>
           </div>
-          <div class="video-container">
-            <video id="instruction-video" controls playsinline></video>
+          <div class="video-container instruction-container">
+            <video id="instruction-video" playsinline loop></video>
+            <canvas id="instruction-canvas"></canvas>
+            <div id="instruction-overlay" class="camera-overlay">
+              <span class="overlay-text">選擇指導影片</span>
+            </div>
           </div>
         </section>
 
@@ -121,6 +130,6 @@
       </main>
     </div>
 
-    <script src="./app.js?v=5"></script>
+    <script src="./app.js?v=6"></script>
   </body>
 </html>

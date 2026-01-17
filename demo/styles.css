@@ -139,6 +139,56 @@ body {
   object-fit: contain;
 }
 
+/* Instruction video with pose overlay */
+.instruction-container video,
+.instruction-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.instruction-container video {
+  opacity: 0.6;
+}
+
+.instruction-container canvas {
+  pointer-events: none;
+}
+
+.overlay-text {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Opacity slider */
+.opacity-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.opacity-slider input[type="range"] {
+  width: 60px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-input);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.opacity-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--primary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
 .file-picker {
   display: inline-flex;
   align-items: center;
