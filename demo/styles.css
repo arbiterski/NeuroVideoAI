@@ -617,6 +617,12 @@ body {
     padding: 8px;
   }
   
+  .recording-layout-combined {
+    grid-template-columns: 1fr 220px;
+    gap: 8px;
+    padding: 8px;
+  }
+  
   .topbar {
     padding: 6px 12px;
     height: 40px;
@@ -655,6 +661,10 @@ body {
     grid-template-columns: 1fr 1fr 160px;
   }
   
+  .recording-layout-combined {
+    grid-template-columns: 1fr 180px;
+  }
+  
   .control-section {
     gap: 8px;
   }
@@ -675,6 +685,13 @@ body {
   .recording-layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(120px, 1fr) minmax(200px, 2fr) auto;
+  }
+  
+  .recording-layout-combined {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    gap: 8px;
+    padding: 8px;
   }
   
   .admin-layout {
