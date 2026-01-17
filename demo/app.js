@@ -43,17 +43,22 @@ const API_BASE_URL = (() => {
 
 console.log('API Base URL:', API_BASE_URL);
 
-// Set default patient ID on page load
-if (patientIdInput && !patientIdInput.value) {
-  patientIdInput.value = generatePatientId();
-}
-
+// Generate patient ID function
 function generatePatientId() {
   const now = new Date();
-  const date = now.toISOString().slice(2, 10).replace(/-/g, '');
-  const time = now.toISOString().slice(11, 16).replace(':', '');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
   const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-  return `P${date}-${time}-${rand}`;
+  return `P${mm}${dd}-${hh}${mi}-${rand}`;
+}
+
+// Set default patient ID on page load
+console.log('patientIdInput:', patientIdInput);
+if (patientIdInput) {
+  patientIdInput.value = generatePatientId();
+  console.log('Set patient ID:', patientIdInput.value);
 }
 
 // MediaPipe Pose setup
