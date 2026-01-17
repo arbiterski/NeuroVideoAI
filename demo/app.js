@@ -43,6 +43,19 @@ const API_BASE_URL = (() => {
 
 console.log('API Base URL:', API_BASE_URL);
 
+// Set default patient ID on page load
+if (patientIdInput && !patientIdInput.value) {
+  patientIdInput.value = generatePatientId();
+}
+
+function generatePatientId() {
+  const now = new Date();
+  const date = now.toISOString().slice(2, 10).replace(/-/g, '');
+  const time = now.toISOString().slice(11, 16).replace(':', '');
+  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+  return `P${date}-${time}-${rand}`;
+}
+
 // MediaPipe Pose setup
 const pose = new Pose({
   locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
@@ -278,14 +291,6 @@ recordsBody?.addEventListener("click", async (event) => {
 });
 
 // Helper Functions
-function generatePatientId() {
-  const now = new Date();
-  const date = now.toISOString().slice(2, 10).replace(/-/g, '');
-  const time = now.toISOString().slice(11, 16).replace(':', '');
-  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-  return `P${date}-${time}-${rand}`;
-}
-
 function updateStatus(message) {
   if (statusLabel) {
     statusLabel.textContent = message || "就緒";
