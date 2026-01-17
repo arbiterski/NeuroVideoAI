@@ -13,13 +13,13 @@ app.use(cors());
 app.use(express.json());
 
 // 建立上傳目錄
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 // 建立資料庫目錄
-const dbDir = path.join(__dirname, 'data');
+const dbDir = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
@@ -105,12 +105,12 @@ const dbOperations = {
   `)
 };
 
-// 靜態檔案服務 - 從 demo/ 資料夾提供
-app.use(express.static(path.join(__dirname, 'demo')));
+// 靜態檔案服務 - 從當前資料夾提供
+app.use(express.static(__dirname));
 
 // 根路徑提供 index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'demo', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // 上傳錄影檔案

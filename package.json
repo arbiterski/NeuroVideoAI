@@ -2,10 +2,10 @@
   "name": "neurovideoai",
   "version": "1.0.0",
   "description": "Smart Camera System for Movement Analysis",
-  "main": "server.js",
+  "main": "demo/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node demo/server.js",
+    "dev": "node demo/server.js"
   },
   "keywords": [
     "mediapipe",
