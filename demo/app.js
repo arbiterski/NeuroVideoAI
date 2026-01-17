@@ -1,12 +1,10 @@
 // DOM Elements
 const instructionInput = document.getElementById("instruction-file");
 const instructionVideo = document.getElementById("instruction-video");
-const instructionCanvas = document.getElementById("instruction-canvas");
-const instructionOverlay = document.getElementById("instruction-overlay");
 const instructionOpacity = document.getElementById("instruction-opacity");
 const instructionSelect = document.getElementById("instruction-select");
 const cameraVideo = document.getElementById("camera-video");
-const cameraCanvas = document.getElementById("camera-canvas");
+const combinedCanvas = document.getElementById("combined-canvas");
 const cameraOverlay = document.getElementById("camera-overlay");
 const startCameraButton = document.getElementById("start-camera");
 const startRecordingButton = document.getElementById("start-recording");
@@ -27,8 +25,12 @@ const previewVideo = document.getElementById("preview-video");
 let mediaStream = null;
 let recorder = null;
 let recordingChunks = [];
-let poseActive = false;
-let instructionPoseActive = false;
+let renderLoopActive = false;
+let instructionOpacityValue = 0.5;
+
+// Store pose results for combined rendering
+let cameraPoseResults = null;
+let instructionPoseResults = null;
 
 const sessionStorageKey = "poseSessions";
 
@@ -66,12 +68,12 @@ if (patientIdInput) {
   console.log('Set patient ID:', patientIdInput.value);
 }
 
-// MediaPipe Pose setup
-const pose = new Pose({
+// MediaPipe Pose for camera
+const cameraPose = new Pose({
   locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
 });
 
-pose.setOptions({
+cameraPose.setOptions({
   modelComplexity: 1,
   smoothLandmarks: true,
   enableSegmentation: false,
@@ -79,31 +81,8 @@ pose.setOptions({
   minTrackingConfidence: 0.6,
 });
 
-pose.onResults((results) => {
-  const ctx = cameraCanvas.getContext("2d");
-  if (!ctx) return;
-  
-  if (cameraCanvas.width !== cameraVideo.videoWidth) {
-    cameraCanvas.width = cameraVideo.videoWidth;
-    cameraCanvas.height = cameraVideo.videoHeight;
-  }
-  
-  ctx.save();
-  ctx.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
-  ctx.drawImage(results.image, 0, 0, cameraCanvas.width, cameraCanvas.height);
-  
-  if (results.poseLandmarks) {
-    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
-      color: "#00d4ff",
-      lineWidth: 3,
-    });
-    drawLandmarks(ctx, results.poseLandmarks, {
-      color: "#00ff88",
-      lineWidth: 2,
-      radius: 4,
-    });
-  }
-  ctx.restore();
+cameraPose.onResults((results) => {
+  cameraPoseResults = results.poseLandmarks || null;
 });
 
 // MediaPipe Pose for instruction video
@@ -120,32 +99,66 @@ instructionPose.setOptions({
 });
 
 instructionPose.onResults((results) => {
-  if (!instructionCanvas) return;
-  const ctx = instructionCanvas.getContext("2d");
+  instructionPoseResults = results.poseLandmarks || null;
+});
+
+// Combined render loop - draws both videos and poses on single canvas
+function renderCombinedFrame() {
+  if (!combinedCanvas) return;
+  const ctx = combinedCanvas.getContext("2d");
   if (!ctx) return;
   
-  if (instructionCanvas.width !== instructionVideo.videoWidth) {
-    instructionCanvas.width = instructionVideo.videoWidth;
-    instructionCanvas.height = instructionVideo.videoHeight;
+  // Set canvas size based on camera
+  const width = cameraVideo.videoWidth || 1280;
+  const height = cameraVideo.videoHeight || 720;
+  
+  if (combinedCanvas.width !== width || combinedCanvas.height !== height) {
+    combinedCanvas.width = width;
+    combinedCanvas.height = height;
   }
   
-  ctx.save();
-  ctx.clearRect(0, 0, instructionCanvas.width, instructionCanvas.height);
+  ctx.clearRect(0, 0, width, height);
   
-  if (results.poseLandmarks) {
-    // Draw reference pose with different color (yellow/orange)
-    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
-      color: "#ffa502",
-      lineWidth: 4,
+  // 1. Draw camera video first (full size, full opacity)
+  ctx.globalAlpha = 1;
+  if (cameraVideo && cameraVideo.readyState >= 2) {
+    ctx.drawImage(cameraVideo, 0, 0, width, height);
+  }
+  
+  // 2. Draw instruction video overlay (semi-transparent)
+  if (instructionVideo && instructionVideo.readyState >= 2 && !instructionVideo.paused) {
+    ctx.globalAlpha = instructionOpacityValue;
+    ctx.drawImage(instructionVideo, 0, 0, width, height);
+    
+    // 3. Draw instruction pose skeleton (orange/red) - more visible
+    ctx.globalAlpha = Math.min(1, instructionOpacityValue + 0.3);
+    if (instructionPoseResults) {
+      drawConnectors(ctx, instructionPoseResults, POSE_CONNECTIONS, {
+        color: "#ffa502",
+        lineWidth: 5,
+      });
+      drawLandmarks(ctx, instructionPoseResults, {
+        color: "#ff6348",
+        lineWidth: 2,
+        radius: 6,
+      });
+    }
+  }
+  
+  // 4. Draw camera pose skeleton (cyan/green) - always on top
+  ctx.globalAlpha = 1;
+  if (cameraPoseResults) {
+    drawConnectors(ctx, cameraPoseResults, POSE_CONNECTIONS, {
+      color: "#00d4ff",
+      lineWidth: 3,
     });
-    drawLandmarks(ctx, results.poseLandmarks, {
-      color: "#ff6b6b",
+    drawLandmarks(ctx, cameraPoseResults, {
+      color: "#00ff88",
       lineWidth: 2,
-      radius: 5,
+      radius: 4,
     });
   }
-  ctx.restore();
-});
+}
 
 // Initialize
 initNavigation();
@@ -155,25 +168,12 @@ instructionInput?.addEventListener("change", (event) => {
   const [file] = event.target.files;
   if (!file) return;
   instructionVideo.src = URL.createObjectURL(file);
-  
-  instructionVideo.onloadeddata = () => {
-    // Hide overlay
-    if (instructionOverlay) {
-      instructionOverlay.classList.add("hidden");
-    }
-    // Start pose detection on instruction video
-    startInstructionPoseLoop();
-  };
-  
   instructionVideo.play().catch(() => {});
 });
 
 // Opacity slider handler
 instructionOpacity?.addEventListener("input", (event) => {
-  const opacity = event.target.value / 100;
-  if (instructionVideo) {
-    instructionVideo.style.opacity = opacity;
-  }
+  instructionOpacityValue = event.target.value / 100;
 });
 
 // Load uploaded videos into select dropdown
@@ -207,16 +207,7 @@ async function loadVideoList() {
 instructionSelect?.addEventListener("change", (event) => {
   const url = event.target.value;
   if (!url) return;
-  
   instructionVideo.src = `${API_BASE_URL}${url}`;
-  
-  instructionVideo.onloadeddata = () => {
-    if (instructionOverlay) {
-      instructionOverlay.classList.add("hidden");
-    }
-    startInstructionPoseLoop();
-  };
-  
   instructionVideo.play().catch(() => {});
 });
 
@@ -425,39 +416,41 @@ function setRecordingState(isRecording) {
   }
 }
 
-function startPoseLoop() {
-  if (poseActive) return;
-  poseActive = true;
+// Combined render loop - processes both videos and renders to single canvas
+function startRenderLoop() {
+  if (renderLoopActive) return;
+  renderLoopActive = true;
+  
   const loop = async () => {
-    if (!poseActive) return;
-    if (cameraVideo.readyState >= 2) {
-      await pose.send({ image: cameraVideo });
+    if (!renderLoopActive) return;
+    
+    // Process camera pose
+    if (cameraVideo && cameraVideo.readyState >= 2) {
+      await cameraPose.send({ image: cameraVideo });
     }
-    requestAnimationFrame(loop);
-  };
-  loop();
-}
-
-function stopPoseLoop() {
-  poseActive = false;
-}
-
-function startInstructionPoseLoop() {
-  if (instructionPoseActive) return;
-  instructionPoseActive = true;
-  const loop = async () => {
-    if (!instructionPoseActive) return;
+    
+    // Process instruction pose
     if (instructionVideo && instructionVideo.readyState >= 2 && !instructionVideo.paused) {
       await instructionPose.send({ image: instructionVideo });
     }
+    
+    // Render combined frame
+    renderCombinedFrame();
+    
     requestAnimationFrame(loop);
   };
   loop();
 }
 
-function stopInstructionPoseLoop() {
-  instructionPoseActive = false;
+function stopRenderLoop() {
+  renderLoopActive = false;
 }
+
+// Legacy function names for compatibility
+function startPoseLoop() { startRenderLoop(); }
+function stopPoseLoop() { stopRenderLoop(); }
+function startInstructionPoseLoop() { /* handled by main loop */ }
+function stopInstructionPoseLoop() { /* handled by main loop */ }
 
 function getRecorderOptions() {
   const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
@@ -610,17 +603,13 @@ function setActiveView(view) {
   });
   
   if (isAdmin) {
-    stopPoseLoop();
-    stopInstructionPoseLoop();
+    stopRenderLoop();
     loadRecords();
     window.location.hash = "admin";
   } else {
     window.location.hash = "";
     if (mediaStream) {
-      startPoseLoop();
-    }
-    if (instructionVideo && instructionVideo.src) {
-      startInstructionPoseLoop();
+      startRenderLoop();
     }
   }
 }
