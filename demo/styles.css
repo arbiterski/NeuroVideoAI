@@ -189,6 +189,22 @@ body {
   cursor: pointer;
 }
 
+.video-select {
+  padding: 4px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  max-width: 120px;
+}
+
+.video-select:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
 .file-picker {
   display: inline-flex;
   align-items: center;

@@ -4,6 +4,7 @@ const instructionVideo = document.getElementById("instruction-video");
 const instructionCanvas = document.getElementById("instruction-canvas");
 const instructionOverlay = document.getElementById("instruction-overlay");
 const instructionOpacity = document.getElementById("instruction-opacity");
+const instructionSelect = document.getElementById("instruction-select");
 const cameraVideo = document.getElementById("camera-video");
 const cameraCanvas = document.getElementById("camera-canvas");
 const cameraOverlay = document.getElementById("camera-overlay");
@@ -174,6 +175,53 @@ instructionOpacity?.addEventListener("input", (event) => {
     instructionVideo.style.opacity = opacity;
   }
 });
+
+// Load uploaded videos into select dropdown
+async function loadVideoList() {
+  if (!instructionSelect) return;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/videos`);
+    const videos = await response.json();
+    
+    // Clear existing options except first
+    instructionSelect.innerHTML = '<option value="">選擇已錄影片...</option>';
+    
+    videos.forEach(video => {
+      const option = document.createElement('option');
+      option.value = video.url;
+      const date = new Date(video.created);
+      const dateStr = date.toLocaleString('zh-TW', { 
+        month: 'numeric', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit' 
+      });
+      const sizeKB = Math.round(video.size / 1024);
+      option.textContent = `${dateStr} (${sizeKB}KB)`;
+      instructionSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error loading video list:', error);
+  }
+}
+
+// Handle video selection from dropdown
+instructionSelect?.addEventListener("change", (event) => {
+  const url = event.target.value;
+  if (!url) return;
+  
+  instructionVideo.src = `${API_BASE_URL}${url}`;
+  
+  instructionVideo.onloadeddata = () => {
+    if (instructionOverlay) {
+      instructionOverlay.classList.add("hidden");
+    }
+    startInstructionPoseLoop();
+  };
+  
+  instructionVideo.play().catch(() => {});
+});
+
+// Load video list on page load
+loadVideoList();
 
 startCameraButton?.addEventListener("click", async () => {
   if (mediaStream) return;

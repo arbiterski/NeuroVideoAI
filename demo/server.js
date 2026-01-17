@@ -237,6 +237,32 @@ app.delete('/api/sessions/:sessionId', (req, res) => {
   }
 });
 
+// 列出所有上傳的影片（可用作指導影片）
+app.get('/api/videos', (req, res) => {
+  try {
+    const files = fs.readdirSync(uploadsDir)
+      .filter(f => f.endsWith('.webm') || f.endsWith('.mp4'))
+      .map(filename => {
+        const filepath = path.join(uploadsDir, filename);
+        const stats = fs.statSync(filepath);
+        return {
+          filename,
+          url: `/uploads/${filename}`,
+          size: stats.size,
+          created: stats.birthtime
+        };
+      })
+      .sort((a, b) => new Date(b.created) - new Date(a.created));
+    res.json(files);
+  } catch (error) {
+    console.error('Error listing videos:', error);
+    res.json([]);
+  }
+});
+
+// 提供 uploads 資料夾的靜態檔案
+app.use('/uploads', express.static(uploadsDir));
+
 // 健康檢查
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
